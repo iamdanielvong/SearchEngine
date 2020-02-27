@@ -56,7 +56,7 @@ def computeWordFrequencies(aList, frequencyDict):
 if __name__ == "__main__":
 
     # Variables
-    directory = "/Users/daniel/Downloads/WEBPAGES_CLEAN/"
+    directory = r"C:\\Users\\STP Interlude\\Desktop\\WEBPAGES_CLEAN\\"
     docId_url_dict = {}
     count = 0
 
@@ -97,7 +97,9 @@ if __name__ == "__main__":
                 # extractedTokens will return [<strong> Hi my name is Daniel </strong>] and also remove all of that from soup.text
                 # We will need to find a way to split that 1 list element into multiple i.e. [<strong>, Hi, my, name, is, Daniel, </strong>]
                 # Then we need to store the token in the database, update its frequency and score it
-                # extractedTokens = [s.extract() for s in soup('strong')]
+                #extractedTokens = [s.extract() for s in soup('strong')]
+                # if(len(extractedTokens) > 0):
+                #     print(extractedTokens)
                 # Need to check if each character is alphanumeric, ie we do not need to tokenize characters such as @, !, #, $
                 alphaNumString = ''
                 overallWords = 0
@@ -107,6 +109,7 @@ if __name__ == "__main__":
                     else:
                         overallWords += 1
                         if (alphaNumString != ''):
+                            alphaNumString = alphaNumString.lower()
                             word_tokens = word_tokenize(alphaNumString)
                             # print(word_tokens)
                             tokenList = [w for w in word_tokens if not w in stopWord]
@@ -114,32 +117,32 @@ if __name__ == "__main__":
                             # only lemmatizes nouns by default...so we are only lemmatizing only part of the tokens
                             for w in tokenList:
                                 w = lemmatizer.lemmatize(w)
-                                if w == "Mondego":
+                                if w == "mondego":
                                     mondegoCounter += 1
                                     mondegoSet.add(docID)
                                     # print("Mondego: " + str(mondegoSet))
                                     # print ("Mondego DocID:", docID," Freq:", mondegoCounter)
-                                    f = open("/Users/daniel/Downloads/WEBPAGES_CLEAN/Output/Mondego.txt", "a")
-                                    temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, mondegoCounter, docId_url_dict[docID], (mondegoCounter * 2)/overallWords)
-                                    f.write(temp)
-                                    f.close()
+                                    f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Mondego.txt", "a")
+                                    #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, mondegoCounter, docId_url_dict[docID], (mondegoCounter * 2)/overallWords)
+                                    #f.write(temp)
+                                    #f.close()
 
-                                if w == "Informatics":
+                                if w == "informatics":
                                     infoCounter += 1
                                     infoSet.add(docID)
                                     # print("Informatics: " +str(infoSet))
                                     # print("Informatics DocID::",docID, " Freq:", infoCounter)
-                                    f = open("/Users/daniel/Downloads/WEBPAGES_CLEAN/Output/Infomatics.txt", "a")
+                                    f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Infomatics.txt", "a")
                                     temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, infoCounter, docId_url_dict[docID], (infoCounter * 2)/overallWords)
                                     f.write(temp)
                                     f.close()
 
-                                if w == "Irvine":
+                                if w == "irvine":
                                     irvineCounter += 1
                                     irvineSet.add(docID)
                                     # print("Irvine: " + str(irvineSet))
                                     # print("Irvine DocID:", docID, " Freq:", irvineCounter)
-                                    f = open("/Users/daniel/Downloads/WEBPAGES_CLEAN/Output/Irvine.txt", "a")
+                                    f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Irvine.txt", "a")
                                     temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, irvineCounter, docId_url_dict[docID], (irvineCounter * 2)/overallWords)
                                     f.write(temp)
                                     f.close()
