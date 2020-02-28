@@ -5,6 +5,33 @@ from bs4 import BeautifulSoup
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+import psycopg2
+
+try:
+    connection = psycopg2.connect(user = "postgres",
+                                  password = "mysecretpassword",
+                                  host = "127.0.0.1",
+                                  port = "5432",
+                                  database = "postgres")
+
+    cursor = connection.cursor()
+    # Print PostgreSQL Connection properties
+    print ( connection.get_dsn_parameters(),"\n")
+
+    # Print PostgreSQL version
+    cursor.execute("SELECT version();")
+    record = cursor.fetchone()
+    print("You are connected to - ", record,"\n")
+
+except (Exception, psycopg2.Error) as error :
+    print ("Error while connecting to PostgreSQL", error)
+# finally:
+#     #closing database connection.
+#         if(connection):
+#             cursor.close()
+#             connection.close()
+#             print("PostgreSQL connection is closed")
+
 
 #Sets of document_ids
 mondegoSet = set()
@@ -53,17 +80,38 @@ def computeWordFrequencies(aList, frequencyDict):
     return frequencyDict
 
 
+def insert_row(doc_id, word, freq, url, tfidf):
+    sql = """INSERT INTO search_engine_tfidf(doc_id, word, frequency, url, tf_idf)
+              VALUES(%s, %s, %s, %s, %s);"""
+    try:
+        connection = psycopg2.connect(user="postgres",
+                                      password="mysecretpassword",
+                                      host="127.0.0.1",
+                                      port="5432",
+                                      database="postgres")
+
+        cursor = connection.cursor()
+        cursor.execute(sql, (doc_id, word, freq, url, tfidf))
+        connection.commit()
+        cursor.close
+
+    except (Exception, psycopg2.Error) as error:
+        print("Error while connecting to PostgreSQL", error)
+    finally:
+        if connection is not None:
+            connection.close()
+
 if __name__ == "__main__":
 
     # Variables
-    directory = r"C:\\Users\\STP Interlude\\Desktop\\WEBPAGES_CLEAN\\"
+    directory = "/Users/mickychetta/Downloads/WEBPAGES_CLEAN"
     docId_url_dict = {}
     count = 0
 
     # Iterates through the directory first to fill up the dictionary to avoid data error
     for folder in os.listdir(directory):
         if folder.endswith(".json"):
-            with open(directory + folder) as f:
+            with open(directory + "/" + folder) as f:
                 docId_url_dict = json.load(f)
             break
 
@@ -79,31 +127,22 @@ if __name__ == "__main__":
             continue
 
         #Iterates through files
-        for file in os.listdir(directory + folder):
-            count += 1
-            docID = os.path.join(folder, file)
+        for file in os.listdir(directory + '/' + folder):
+            #count += 1
+            docID = os.path.join(folder, file) #key in bookkeeping.json file
             # print("DocID: " + docID + " URL: " + docId_url_dict[docID])
             # Opens the file, ignores all non-english characters
-            with open(directory + folder + "/" + file, 'r', encoding= 'ascii', errors= 'ignore') as f:
+            with open(directory + '/' + folder + "/" + file, 'r', encoding='ascii', errors='ignore') as f:
                 mondegoCounter = 0
                 irvineCounter = 0
                 infoCounter = 0
-                # Read the file
                 contents = f.read()
-                # Make a BS4 object from the file so we can parse tags like <strong></strong>, <h1></h1>
                 soup = BeautifulSoup(contents, 'lxml')
-                # Code below is suppose to extract the tag AND the content between it and store it in extractedTokens
-                # For example, if your file contains <h1> <strong> Hi my name is Daniel </strong> </h1>
-                # extractedTokens will return [<strong> Hi my name is Daniel </strong>] and also remove all of that from soup.text
-                # We will need to find a way to split that 1 list element into multiple i.e. [<strong>, Hi, my, name, is, Daniel, </strong>]
-                # Then we need to store the token in the database, update its frequency and score it
-                #extractedTokens = [s.extract() for s in soup('strong')]
-                # if(len(extractedTokens) > 0):
-                #     print(extractedTokens)
-                # Need to check if each character is alphanumeric, ie we do not need to tokenize characters such as @, !, #, $
                 alphaNumString = ''
                 overallWords = 0
+
                 for word in soup.text:
+
                     if word.isalnum():
                         alphaNumString += word
                     else:
@@ -120,32 +159,31 @@ if __name__ == "__main__":
                                 if w == "mondego":
                                     mondegoCounter += 1
                                     mondegoSet.add(docID)
-                                    # print("Mondego: " + str(mondegoSet))
-                                    # print ("Mondego DocID:", docID," Freq:", mondegoCounter)
-                                    f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Mondego.txt", "a")
                                     #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, mondegoCounter, docId_url_dict[docID], (mondegoCounter * 2)/overallWords)
-                                    #f.write(temp)
-                                    #f.close()
+                                    insert_row(docID, "mondego", mondegoCounter, docId_url_dict[docID], (mondegoCounter * 2)/overallWords)
+
 
                                 if w == "informatics":
                                     infoCounter += 1
                                     infoSet.add(docID)
                                     # print("Informatics: " +str(infoSet))
                                     # print("Informatics DocID::",docID, " Freq:", infoCounter)
-                                    f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Infomatics.txt", "a")
-                                    temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, infoCounter, docId_url_dict[docID], (infoCounter * 2)/overallWords)
-                                    f.write(temp)
-                                    f.close()
+                                    #f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Infomatics.txt", "a")
+                                    #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, infoCounter, docId_url_dict[docID], (infoCounter * 2)/overallWords)
+                                    insert_row(docID, "informatics", infoCounter, docId_url_dict[docID], (infoCounter * 2)/overallWords)
+                                    # f.write(temp)
+                                    # f.close()
 
                                 if w == "irvine":
                                     irvineCounter += 1
                                     irvineSet.add(docID)
                                     # print("Irvine: " + str(irvineSet))
                                     # print("Irvine DocID:", docID, " Freq:", irvineCounter)
-                                    f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Irvine.txt", "a")
-                                    temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, irvineCounter, docId_url_dict[docID], (irvineCounter * 2)/overallWords)
-                                    f.write(temp)
-                                    f.close()
+                                    #f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Irvine.txt", "a")
+                                    #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, irvineCounter, docId_url_dict[docID], (irvineCounter * 2)/overallWords)
+                                    insert_row(docID, "irvine", irvineCounter, docId_url_dict[docID], (irvineCounter * 2)/overallWords)
+                                    # f.write(temp)
+                                    # f.close()
 
                             #computeWordFrequencies(tokenList, tokenDict)
                             alphaNumString = ''
