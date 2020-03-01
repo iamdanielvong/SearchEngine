@@ -5,6 +5,10 @@ from bs4 import BeautifulSoup
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+from nltk import pos_tag
+import re
+from collections import Counter
+import math
 import psycopg2
 
 try:
@@ -25,12 +29,12 @@ try:
 
 except (Exception, psycopg2.Error) as error :
     print ("Error while connecting to PostgreSQL", error)
-# finally:
-#     #closing database connection.
-#         if(connection):
-#             cursor.close()
-#             connection.close()
-#             print("PostgreSQL connection is closed")
+finally:
+    #closing database connection.
+        if(connection):
+            cursor.close()
+            connection.close()
+            print("PostgreSQL connection is closed")
 
 
 #Sets of document_ids
@@ -102,12 +106,11 @@ def insert_row(doc_id, word, freq, url, tfidf):
             connection.close()
 
 if __name__ == "__main__":
-
     # Variables
-    directory = "/Users/mickychetta/Downloads/WEBPAGES_CLEAN"
+    directory = r"C:\Users\STP Interlude\Desktop\WEBPAGES_CLEAN"
     docId_url_dict = {}
     count = 0
-
+    overallWords = 0;
     # Iterates through the directory first to fill up the dictionary to avoid data error
     for folder in os.listdir(directory):
         if folder.endswith(".json"):
@@ -133,59 +136,65 @@ if __name__ == "__main__":
             # print("DocID: " + docID + " URL: " + docId_url_dict[docID])
             # Opens the file, ignores all non-english characters
             with open(directory + '/' + folder + "/" + file, 'r', encoding='ascii', errors='ignore') as f:
-                mondegoCounter = 0
-                irvineCounter = 0
-                infoCounter = 0
                 contents = f.read()
                 soup = BeautifulSoup(contents, 'lxml')
                 alphaNumString = ''
-                overallWords = 0
 
-                for word in soup.text:
+                #splitString = soup.text.split(" ");
+                tokens = re.split('[^a-zA-Z]', soup.text.lower())
 
-                    if word.isalnum():
-                        alphaNumString += word
-                    else:
-                        overallWords += 1
-                        if (alphaNumString != ''):
-                            alphaNumString = alphaNumString.lower()
-                            word_tokens = word_tokenize(alphaNumString)
-                            # print(word_tokens)
-                            tokenList = [w for w in word_tokens if not w in stopWord]
+                #Removes empty string from the list after calling re.split
+                tokens = list(filter(None, tokens))
 
-                            # only lemmatizes nouns by default...so we are only lemmatizing only part of the tokens
-                            for w in tokenList:
-                                w = lemmatizer.lemmatize(w)
-                                if w == "mondego":
-                                    mondegoCounter += 1
-                                    mondegoSet.add(docID)
-                                    #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, mondegoCounter, docId_url_dict[docID], (mondegoCounter * 2)/overallWords)
-                                    insert_row(docID, "mondego", mondegoCounter, docId_url_dict[docID], (mondegoCounter * 2)/overallWords)
+                #Removes any instances of stop words from the token list
+                tokens = [w for w in tokens if not w in stopWord]
 
+                # Gets the word type using nltk (noun, verb, etc) and lemmatizes the word based on its type
+                indexI = 0;
+                for word, tag in pos_tag(tokens):
+                    wntag = tag[0].lower()
+                    wntag = wntag if wntag in ['a', 'r', 'n', 'v'] else None
+                    if wntag:
+                        tokens[indexI] = lemmatizer.lemmatize(word, wntag)
 
-                                if w == "informatics":
-                                    infoCounter += 1
-                                    infoSet.add(docID)
-                                    # print("Informatics: " +str(infoSet))
-                                    # print("Informatics DocID::",docID, " Freq:", infoCounter)
-                                    #f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Infomatics.txt", "a")
-                                    #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, infoCounter, docId_url_dict[docID], (infoCounter * 2)/overallWords)
-                                    insert_row(docID, "informatics", infoCounter, docId_url_dict[docID], (infoCounter * 2)/overallWords)
-                                    # f.write(temp)
-                                    # f.close()
+                    indexI += 1
 
-                                if w == "irvine":
-                                    irvineCounter += 1
-                                    irvineSet.add(docID)
-                                    # print("Irvine: " + str(irvineSet))
-                                    # print("Irvine DocID:", docID, " Freq:", irvineCounter)
-                                    #f = open("C:/Users/STP Interlude/Desktop/WEBPAGES_CLEAN/Output/Irvine.txt", "a")
-                                    #temp = "DocID: {} Freq: {} URL: {} tf_id: {}\n".format(docID, irvineCounter, docId_url_dict[docID], (irvineCounter * 2)/overallWords)
-                                    insert_row(docID, "irvine", irvineCounter, docId_url_dict[docID], (irvineCounter * 2)/overallWords)
-                                    # f.write(temp)
-                                    # f.close()
+                #print("FileNum", file, "SplitString:", tokens)
+                freqDictPerDocument = (Counter(tokens))
 
-                            #computeWordFrequencies(tokenList, tokenDict)
-                            alphaNumString = ''
-                # print(tokenDict)
-    print("Count: " + str(count))
+                print(freqDictPerDocument)
+
+                # Get the total number of words in current document
+                totalTermsOfDocument = sum(freqDictPerDocument.values())
+
+                # Create a new dict for tf calculation and copy the keys to reuse
+                tfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+
+                # Create a new dict for idf calculation and copy the keys to reuse
+                idfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+
+                # Create a new dict for FINAL tf-idf calculation and copy the keys to reuse
+                tfidfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+
+                #
+                # for word in tfDictPerDocument:
+                #     # compute the TF for each word...line below works as intended
+                #     tfDictPerDocument[word] = freqDictPerDocument[word]/totalTermsOfDocument
+
+                    # insert the docID | word | word freq | URL
+                    # not sure if code below will work
+                    #insert_row(docID, word, freqDictPerDocument[word], docId_url_dict[docID])
+
+                    #Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
+                    #idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
+
+                    #Now you want to calculate the tf-idf score for each word in the same loop
+                    #tfidfDictPerDocument[word] = tfDictPerDocument[word] * idfDictPerDocument[word]
+
+                    #Now you want to update the rows to add the tf-idf score of that word
+
+                overallWords = overallWords + len(tokens)
+
+    #Prints the total # of words in ALL documents combined
+    print(overallWords)
+
