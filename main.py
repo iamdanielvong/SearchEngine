@@ -192,9 +192,6 @@ def search_engine():
     # print(overallWords)
 
 
-if __name__ == "__main__":
-    search_engine()
-    print('Finished!!!!')
 
 '''
 sql statement should be something like 
@@ -237,32 +234,49 @@ def dotProduct(queries, doc_id):
 def cosineSimilarity(queries, doc_id): 
     score = dotProduct(data, doc_id) / ( rootSumSquare(queries, idf, doc_id) + rootSumSquare(queries, tf, doc_id))
     return score
+'''
 
-def Client side shit():
+def UserInput():
+    try:
+        connection = psycopg2.connect(user="postgres",
+                                      password="mysecretpassword",
+                                      host="127.0.0.1",
+                                      port="5432",
+                                      database="postgres")
+
+        cursor = connection.cursor()
+        print("successfully connected")
+    except (Exception, psycopg2.Error) as error:
+        print("Error while connecting to PostgreSQL", error)
+
     while(1):
         query = input("What do you want to search\n> ")
-        if (query == 'quit'):
+        queryList = query.split()
+
+        if (queryList[0] == 'quit'):
+            cursor.close
+            connection.close
             break
 
-        convert user input into a list
-
-        if list.len == 1:
-            print top 20 urls from db
-            # select url
-            # from table
-            # where word = list[0]
-            # order by tfidf
-            # limit 20
+        if len(queryList) == 1:
+            sql = """SELECT url FROM search_engine WHERE word=%s ORDER BY tf_idf DESC LIMIT 20"""
+            cursor.execute(sql, [queryList[0]])
+            results = cursor.fetchall()
         else:
             # get a list of docs to look through 
             # sql statement could be something like 
             # join all the docIDs that have the words in query 
             # limit by tfid score and limit search to like 50-100
             # put all the results in a docList
-
+            '''
             for i in docList:
                dict{docList[1]} =  cosineSimilarity(query, docList[i])
-
+            '''
             # print top 20 results from dict
+        for key,val in enumerate(results):
+            print(val)
 
-'''
+
+if __name__ == "__main__":
+    UserInput()
+    print('Finished!!!!')
