@@ -11,41 +11,6 @@ from collections import Counter
 import math
 import psycopg2
 
-try:
-    connection = psycopg2.connect(user = "postgres",
-                                  password = "mysecretpassword",
-                                  host = "127.0.0.1",
-                                  port = "5432",
-                                  database = "postgres")
-
-    cursor = connection.cursor()
-    # Print PostgreSQL Connection properties
-    print ( connection.get_dsn_parameters(),"\n")
-
-    # Print PostgreSQL version
-    cursor.execute("SELECT version();")
-    record = cursor.fetchone()
-    print("You are connected to - ", record,"\n")
-
-except (Exception, psycopg2.Error) as error :
-    print ("Error while connecting to PostgreSQL", error)
-finally:
-    #closing database connection.
-        if(connection):
-            cursor.close()
-            connection.close()
-            print("PostgreSQL connection is closed")
-
-
-#Sets of document_ids
-mondegoSet = set()
-infoSet = set()
-irvineSet = set()
-
-mondegoCounter = 0
-infoCounter = 0
-irvineCounter = 0
-
 stopWord = ["a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
             "as", "at", "be", "because", "been",
             "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't",
@@ -66,13 +31,6 @@ stopWord = ["a", "about", "above", "after", "again", "against", "all", "am", "an
             "weren't", "what", "what's", "when", "when's", "where", "where's", "which",
             "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you",
             "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
-
-# This is the lemmatizer.
-lemmatizer = WordNetLemmatizer()
-
-# This is a dictionary of tokens.
-tokenDict = {}
-
 
 def computeWordFrequencies(aList, frequencyDict):
     for word in aList:
@@ -105,12 +63,15 @@ def insert_row(doc_id, word, freq, url, tfidf):
         if connection is not None:
             connection.close()
 
-if __name__ == "__main__":
-    # Variables
-    directory = r"C:\Users\STP Interlude\Desktop\WEBPAGES_CLEAN"
+
+def search_engine():
+    directory = "/Users/mickychetta/Downloads/WEBPAGES_CLEAN"
+    lemmatizer = WordNetLemmatizer()
+    tokenDict = {}
     docId_url_dict = {}
     count = 0
-    overallWords = 0;
+    overallWords = 0
+
     # Iterates through the directory first to fill up the dictionary to avoid data error
     for folder in os.listdir(directory):
         if folder.endswith(".json"):
@@ -120,33 +81,24 @@ if __name__ == "__main__":
 
     # Iterates through folders
     for folder in os.listdir(directory):
-        if folder.endswith(".tsv"):
-            continue
-        if folder.endswith(".json"):
-            continue
-        if folder.endswith(".DS_Store"):
-            continue
-        if folder == 'Output':
+        if folder.endswith(".tsv") or folder.endswith(".json") or folder.endswith(".DS_Store") or folder == 'Output':
             continue
 
-        #Iterates through files
+        # Iterates through files
         for file in os.listdir(directory + '/' + folder):
-            #count += 1
-            docID = os.path.join(folder, file) #key in bookkeeping.json file
-            # print("DocID: " + docID + " URL: " + docId_url_dict[docID])
+            docID = os.path.join(folder, file)  # key in bookkeeping.json file
+
             # Opens the file, ignores all non-english characters
             with open(directory + '/' + folder + "/" + file, 'r', encoding='ascii', errors='ignore') as f:
                 contents = f.read()
                 soup = BeautifulSoup(contents, 'lxml')
                 alphaNumString = ''
-
-                #splitString = soup.text.split(" ");
                 tokens = re.split('[^a-zA-Z]', soup.text.lower())
 
-                #Removes empty string from the list after calling re.split
+                # Removes empty string from the list after calling re.split
                 tokens = list(filter(None, tokens))
 
-                #Removes any instances of stop words from the token list
+                # Removes any instances of stop words from the token list
                 tokens = [w for w in tokens if not w in stopWord]
 
                 # Gets the word type using nltk (noun, verb, etc) and lemmatizes the word based on its type
@@ -159,10 +111,7 @@ if __name__ == "__main__":
 
                     indexI += 1
 
-                #print("FileNum", file, "SplitString:", tokens)
                 freqDictPerDocument = (Counter(tokens))
-
-                print(freqDictPerDocument)
 
                 # Get the total number of words in current document
                 totalTermsOfDocument = sum(freqDictPerDocument.values())
@@ -181,20 +130,24 @@ if __name__ == "__main__":
                 #     # compute the TF for each word...line below works as intended
                 #     tfDictPerDocument[word] = freqDictPerDocument[word]/totalTermsOfDocument
 
-                    # insert the docID | word | word freq | URL
-                    # not sure if code below will work
-                    #insert_row(docID, word, freqDictPerDocument[word], docId_url_dict[docID])
+                # insert the docID | word | word freq | URL
+                # not sure if code below will work
+                # insert_row(docID, word, freqDictPerDocument[word], docId_url_dict[docID])
 
-                    #Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
-                    #idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
+                # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
+                # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
 
-                    #Now you want to calculate the tf-idf score for each word in the same loop
-                    #tfidfDictPerDocument[word] = tfDictPerDocument[word] * idfDictPerDocument[word]
+                # Now you want to calculate the tf-idf score for each word in the same loop
+                # tfidfDictPerDocument[word] = tfDictPerDocument[word] * idfDictPerDocument[word]
 
-                    #Now you want to update the rows to add the tf-idf score of that word
+                # Now you want to update the rows to add the tf-idf score of that word
 
                 overallWords = overallWords + len(tokens)
 
-    #Prints the total # of words in ALL documents combined
-    print(overallWords)
+    # Prints the total # of words in ALL documents combined
+    # print(overallWords)
+
+
+if __name__ == "__main__":
+    search_engine()
 
