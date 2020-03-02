@@ -35,6 +35,31 @@ stopWord = ["a", "about", "above", "after", "again", "against", "all", "am", "an
 stopWord = set(stopWord)
 
 
+try:
+    connection = psycopg2.connect(user = "postgres",
+                                  password = "mysecretpassword",
+                                  host = "127.0.0.1",
+                                  port = "5432",
+                                  database = "postgres")
+
+    cursor = connection.cursor()
+    # Print PostgreSQL Connection properties
+    print ( connection.get_dsn_parameters(),"\n")
+
+    # Print PostgreSQL version
+    cursor.execute("SELECT version();")
+    record = cursor.fetchone()
+    print("You are connected to - ", record,"\n")
+
+except (Exception, psycopg2.Error) as error :
+    print ("Error while connecting to PostgreSQL", error)
+# finally:
+#     #closing database connection.
+#         if(connection):
+#             cursor.close()
+#             connection.close()
+#             print("PostgreSQL connection is closed")
+
 
 
 def computeWordFrequencies(aList, frequencyDict):
@@ -48,8 +73,9 @@ def computeWordFrequencies(aList, frequencyDict):
 
 
 def insert_row(doc_id, word, url, frequency, tf):  # , idf, tf_idf):
-    sql = """INSERT INTO search_engine(doc_id, word, url, frequency, tf)
-              VALUES(%s, %s, %s, %s, %s);"""
+    sql = """INSERT INTO search_engine(doc_id, word, url, frequency, tf) 
+    VALUES(%s, %s, %s, %s, %s) 
+    ON CONFLICT DO NOTHING;"""
     try:
         connection = psycopg2.connect(user="postgres",
                                       password="mysecretpassword",
@@ -76,7 +102,7 @@ def compute_tf(tf_dict, freq_dict, total_term):
 
 
 def search_engine():
-    directory = "/Users/mickychetta/Downloads/WEBPAGES_CLEAN"
+    directory = "/Users/daniel/Downloads/WEBPAGES_RAW"
     lemmatizer = WordNetLemmatizer()
     tokenDict = {}
     docId_url_dict = {}
@@ -137,7 +163,10 @@ def search_engine():
 
             # Create a new dict for tf calculation and copy the keys to reuse
             tfDictPerDocument = dict.fromkeys(freqDictPerDocument)
-            compute_tf(tfDictPerDocument, freqDictPerDocument, totalTermsOfDocument)
+
+            for word in tfDictPerDocument:
+                tfDictPerDocument[word] = freqDictPerDocument[word] / totalTermsOfDocument
+                insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
 
             # Create a new dict for idf calculation and copy the keys to reuse
             idfDictPerDocument = dict.fromkeys(freqDictPerDocument)
@@ -148,8 +177,6 @@ def search_engine():
             # insert the docID | word | word freq | URL
             # not sure if code below will work
 
-        for word in freqDictPerDocument.keys():
-            insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
 
             # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
             # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
@@ -159,7 +186,7 @@ def search_engine():
 
             # Now you want to update the rows to add the tf-idf score of that word
 
-            overallWords = overallWords + len(tokens)
+        overallWords = overallWords + len(tokens)
 
     # Prints the total # of words in ALL documents combined
     # print(overallWords)
@@ -168,3 +195,74 @@ def search_engine():
 if __name__ == "__main__":
     search_engine()
     print('Finished!!!!')
+
+'''
+sql statement should be something like 
+select tf,idf, docId 
+from table
+where word = data[i]
+order by tfidf
+limit by a reasonable amount 20 - 100
+
+
+def rootSumSquare(queries , scoreType, doc_id):
+    # sql statement should look like this
+    select tf/idf 
+    from table
+    where word = queries[i]
+    and doc_id = doc_id
+    # this should go inside the for loop
+
+    total = 0
+    for len of queries:
+        total += (tf or idf)^2
+
+    return square root of total
+
+
+def dotProduct(queries, doc_id):
+    # sql statement should look like this
+    select tfidf, idf
+    from table 
+    where docid = doc_id
+    and word = queries[i]
+    # this should go inside the for loop
+
+    total = 0
+    for len of queries:
+        total += tfidf * idf
+
+    return total
+
+def cosineSimilarity(queries, doc_id): 
+    score = dotProduct(data, doc_id) / ( rootSumSquare(queries, idf, doc_id) + rootSumSquare(queries, tf, doc_id))
+    return score
+
+def Client side shit():
+    while(1):
+        query = input("What do you want to search\n> ")
+        if (query == 'quit'):
+            break
+
+        convert user input into a list
+
+        if list.len == 1:
+            print top 20 urls from db
+            # select url
+            # from table
+            # where word = list[0]
+            # order by tfidf
+            # limit 20
+        else:
+            # get a list of docs to look through 
+            # sql statement could be something like 
+            # join all the docIDs that have the words in query 
+            # limit by tfid score and limit search to like 50-100
+            # put all the results in a docList
+
+            for i in docList:
+               dict{docList[1]} =  cosineSimilarity(query, docList[i])
+
+            # print top 20 results from dict
+
+'''
