@@ -32,6 +32,7 @@ stopWord = ["a", "about", "above", "after", "again", "against", "all", "am", "an
             "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you",
             "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
 
+
 def computeWordFrequencies(aList, frequencyDict):
     for word in aList:
         if word in frequencyDict:
@@ -42,8 +43,8 @@ def computeWordFrequencies(aList, frequencyDict):
     return frequencyDict
 
 
-def insert_row(doc_id, word, freq, url, tfidf):
-    sql = """INSERT INTO search_engine_tfidf(doc_id, word, frequency, url, tf_idf)
+def insert_row(doc_id, word, url, frequency, tf):#, idf, tf_idf):
+    sql = """INSERT INTO search_engine_tfidf(doc_id, word, url, frequency, tf)
               VALUES(%s, %s, %s, %s, %s);"""
     try:
         connection = psycopg2.connect(user="postgres",
@@ -53,7 +54,7 @@ def insert_row(doc_id, word, freq, url, tfidf):
                                       database="postgres")
 
         cursor = connection.cursor()
-        cursor.execute(sql, (doc_id, word, freq, url, tfidf))
+        cursor.execute(sql, (doc_id, word, url, frequency, tf))#, idf, tf_idf))
         connection.commit()
         cursor.close
 
@@ -62,6 +63,11 @@ def insert_row(doc_id, word, freq, url, tfidf):
     finally:
         if connection is not None:
             connection.close()
+
+
+def compute_tf(tf_dict, freq_dict, total_term):
+    for word in tf_dict:
+        tf_dict[word] = freq_dict[word]/total_term
 
 
 def search_engine():
@@ -118,6 +124,7 @@ def search_engine():
 
                 # Create a new dict for tf calculation and copy the keys to reuse
                 tfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+                compute_tf(tfDictPerDocument, freqDictPerDocument, totalTermsOfDocument)
 
                 # Create a new dict for idf calculation and copy the keys to reuse
                 idfDictPerDocument = dict.fromkeys(freqDictPerDocument)
@@ -125,14 +132,12 @@ def search_engine():
                 # Create a new dict for FINAL tf-idf calculation and copy the keys to reuse
                 tfidfDictPerDocument = dict.fromkeys(freqDictPerDocument)
 
-                #
-                # for word in tfDictPerDocument:
-                #     # compute the TF for each word...line below works as intended
-                #     tfDictPerDocument[word] = freqDictPerDocument[word]/totalTermsOfDocument
 
                 # insert the docID | word | word freq | URL
                 # not sure if code below will work
-                # insert_row(docID, word, freqDictPerDocument[word], docId_url_dict[docID])
+
+                for word in freqDictPerDocument.keys():
+                    insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
 
                 # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
                 # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
@@ -150,4 +155,4 @@ def search_engine():
 
 if __name__ == "__main__":
     search_engine()
-
+    print('Finished!!!!')
