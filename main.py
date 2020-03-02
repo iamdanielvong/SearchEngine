@@ -43,9 +43,10 @@ def computeWordFrequencies(aList, frequencyDict):
     return frequencyDict
 
 
-def insert_row(doc_id, word, url, frequency, tf):#, idf, tf_idf):
+def insert_row(doc_id, word, url, frequency, tf):  # , idf, tf_idf):
     sql = """INSERT INTO search_engine_tfidf(doc_id, word, url, frequency, tf)
-              VALUES(%s, %s, %s, %s, %s);"""
+              VALUES(%s, %s, %s, %s, %s)
+              ON CONFLICT DO NOTHING;"""
     try:
         connection = psycopg2.connect(user="postgres",
                                       password="mysecretpassword",
@@ -54,7 +55,7 @@ def insert_row(doc_id, word, url, frequency, tf):#, idf, tf_idf):
                                       database="postgres")
 
         cursor = connection.cursor()
-        cursor.execute(sql, (doc_id, word, url, frequency, tf))#, idf, tf_idf))
+        cursor.execute(sql, (doc_id, word, url, frequency, tf))  # , idf, tf_idf))
         connection.commit()
         cursor.close
 
@@ -67,7 +68,7 @@ def insert_row(doc_id, word, url, frequency, tf):#, idf, tf_idf):
 
 def compute_tf(tf_dict, freq_dict, total_term):
     for word in tf_dict:
-        tf_dict[word] = freq_dict[word]/total_term
+        tf_dict[word] = freq_dict[word] / total_term
 
 
 def search_engine():
@@ -79,75 +80,80 @@ def search_engine():
     overallWords = 0
 
     # Iterates through the directory first to fill up the dictionary to avoid data error
-    for folder in os.listdir(directory):
-        if folder.endswith(".json"):
-            with open(directory + "/" + folder) as f:
-                docId_url_dict = json.load(f)
-            break
+    # for folder in os.listdir(directory):
+    #     if folder.endswith(".json"):
+    #         with open(directory + "/" + folder) as f:
+    #             docId_url_dict = json.load(f)
+    #         break
 
     # Iterates through folders
-    for folder in os.listdir(directory):
-        if folder.endswith(".tsv") or folder.endswith(".json") or folder.endswith(".DS_Store") or folder == 'Output':
-            continue
+    # for folder in os.listdir(directory):
+    #     if folder.endswith(".tsv") or folder.endswith(".json") or folder.endswith(".DS_Store") or folder == 'Output':
+    #         continue
 
-        # Iterates through files
-        for file in os.listdir(directory + '/' + folder):
-            docID = os.path.join(folder, file)  # key in bookkeeping.json file
+    # Iterates through files
 
-            # Opens the file, ignores all non-english characters
-            with open(directory + '/' + folder + "/" + file, 'r', encoding='ascii', errors='ignore') as f:
-                contents = f.read()
-                soup = BeautifulSoup(contents, 'lxml')
-                alphaNumString = ''
-                tokens = re.split('[^a-zA-Z]', soup.text.lower())
+    with open(directory + '/bookkeeping.json') as f:
+        docId_url_dict = json.load(f)
 
-                # Removes empty string from the list after calling re.split
-                tokens = list(filter(None, tokens))
+    for docID in docId_url_dict:
 
-                # Removes any instances of stop words from the token list
-                tokens = [w for w in tokens if not w in stopWord]
+        # for file in os.listdir(directory + '/' + folder):
+        #     docID = os.path.join(folder, file)  # key in bookkeeping.json file
 
-                # Gets the word type using nltk (noun, verb, etc) and lemmatizes the word based on its type
-                indexI = 0;
-                for word, tag in pos_tag(tokens):
-                    wntag = tag[0].lower()
-                    wntag = wntag if wntag in ['a', 'r', 'n', 'v'] else None
-                    if wntag:
-                        tokens[indexI] = lemmatizer.lemmatize(word, wntag)
+        # Opens the file, ignores all non-english characters
+        with open(directory + '/' + docID, 'r', encoding='ascii', errors='ignore') as f:
+            contents = f.read()
+            soup = BeautifulSoup(contents, 'lxml')
+            alphaNumString = ''
+            tokens = re.split('[^a-zA-Z]', soup.text.lower())
 
-                    indexI += 1
+            # Removes empty string from the list after calling re.split
+            tokens = list(filter(None, tokens))
 
-                freqDictPerDocument = (Counter(tokens))
+            # Removes any instances of stop words from the token list
+            tokens = [w for w in tokens if not w in stopWord]
 
-                # Get the total number of words in current document
-                totalTermsOfDocument = sum(freqDictPerDocument.values())
+            # Gets the word type using nltk (noun, verb, etc) and lemmatizes the word based on its type
+            indexI = 0;
+            for word, tag in pos_tag(tokens):
+                wntag = tag[0].lower()
+                wntag = wntag if wntag in ['a', 'r', 'n', 'v'] else None
+                if wntag:
+                    tokens[indexI] = lemmatizer.lemmatize(word, wntag)
 
-                # Create a new dict for tf calculation and copy the keys to reuse
-                tfDictPerDocument = dict.fromkeys(freqDictPerDocument)
-                compute_tf(tfDictPerDocument, freqDictPerDocument, totalTermsOfDocument)
+                indexI += 1
 
-                # Create a new dict for idf calculation and copy the keys to reuse
-                idfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+            freqDictPerDocument = (Counter(tokens))
 
-                # Create a new dict for FINAL tf-idf calculation and copy the keys to reuse
-                tfidfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+            # Get the total number of words in current document
+            totalTermsOfDocument = sum(freqDictPerDocument.values())
 
+            # Create a new dict for tf calculation and copy the keys to reuse
+            tfDictPerDocument = dict.fromkeys(freqDictPerDocument)
+            compute_tf(tfDictPerDocument, freqDictPerDocument, totalTermsOfDocument)
 
-                # insert the docID | word | word freq | URL
-                # not sure if code below will work
+            # Create a new dict for idf calculation and copy the keys to reuse
+            idfDictPerDocument = dict.fromkeys(freqDictPerDocument)
 
-                for word in freqDictPerDocument.keys():
-                    insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
+            # Create a new dict for FINAL tf-idf calculation and copy the keys to reuse
+            tfidfDictPerDocument = dict.fromkeys(freqDictPerDocument)
 
-                # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
-                # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
+            # insert the docID | word | word freq | URL
+            # not sure if code below will work
 
-                # Now you want to calculate the tf-idf score for each word in the same loop
-                # tfidfDictPerDocument[word] = tfDictPerDocument[word] * idfDictPerDocument[word]
+            for word in freqDictPerDocument.keys():
+                insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
 
-                # Now you want to update the rows to add the tf-idf score of that word
+            # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
+            # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
 
-                overallWords = overallWords + len(tokens)
+            # Now you want to calculate the tf-idf score for each word in the same loop
+            # tfidfDictPerDocument[word] = tfDictPerDocument[word] * idfDictPerDocument[word]
+
+            # Now you want to update the rows to add the tf-idf score of that word
+
+            overallWords = overallWords + len(tokens)
 
     # Prints the total # of words in ALL documents combined
     # print(overallWords)
