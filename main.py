@@ -10,6 +10,7 @@ import re
 from collections import Counter
 import math
 import psycopg2
+import operator
 
 stopWord = ["a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
             "as", "at", "be", "because", "been",
@@ -44,7 +45,7 @@ try:
 
     cursor = connection.cursor()
     # Print PostgreSQL Connection properties
-    print ( connection.get_dsn_parameters(),"\n")
+    #print ( connection.get_dsn_parameters(),"\n")
 
     # Print PostgreSQL version
     cursor.execute("SELECT version();")
@@ -111,20 +112,6 @@ def search_engine():
     freqDictPerDocument = {}
     tfDictPerDocument = {}
 
-    # Iterates through the directory first to fill up the dictionary to avoid data error
-    # for folder in os.listdir(directory):
-    #     if folder.endswith(".json"):
-    #         with open(directory + "/" + folder) as f:
-    #             docId_url_dict = json.load(f)
-    #         break
-
-    # Iterates through folders
-    # for folder in os.listdir(directory):
-    #     if folder.endswith(".tsv") or folder.endswith(".json") or folder.endswith(".DS_Store") or folder == 'Output':
-    #         continue
-
-    # Iterates through files
-
     with open(directory + '/bookkeeping.json') as f:
         docId_url_dict = json.load(f)
 
@@ -174,69 +161,59 @@ def search_engine():
             # Create a new dict for FINAL tf-idf calculation and copy the keys to reuse
             tfidfDictPerDocument = dict.fromkeys(freqDictPerDocument)
 
-            # insert the docID | word | word freq | URL
-            # not sure if code below will work
-
-
-            # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
-            # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
-
-            # Now you want to calculate the tf-idf score for each word in the same loop
-            # tfidfDictPerDocument[word] = tfDictPerDocument[word] * idfDictPerDocument[word]
-
-            # Now you want to update the rows to add the tf-idf score of that word
-
         overallWords = overallWords + len(tokens)
 
-    # Prints the total # of words in ALL documents combined
-    # print(overallWords)
 
 
 
-'''
-sql statement should be something like 
-select tf,idf, docId 
-from table
-where word = data[i]
-order by tfidf
-limit by a reasonable amount 20 - 100
 
 
 def rootSumSquare(queries , scoreType, doc_id):
-    # sql statement should look like this
-    select tf/idf 
-    from table
-    where word = queries[i]
-    and doc_id = doc_id
-    # this should go inside the for loop
-
     total = 0
-    for len of queries:
-        total += (tf or idf)^2
+    for key,val in enumerate(queries):
+        sql = """SELECT {}  
+        FROM search_engine 
+        WHERE word = %s AND doc_id = %s ORDER BY tf_idf DESC LIMIT 50""".format(scoreType)
+        cursor.execute(sql, (val, doc_id))
+        results = cursor.fetchall()
+        for row in results:
 
-    return square root of total
+            total += row[0] ** 2
+
+    return math.sqrt(total)
 
 
 def dotProduct(queries, doc_id):
-    # sql statement should look like this
-    select tfidf, idf
-    from table 
-    where docid = doc_id
-    and word = queries[i]
-    # this should go inside the for loop
-
     total = 0
-    for len of queries:
-        total += tfidf * idf
+    for key, val in enumerate(queries):
+        sql = """SELECT tf_idf, idf
+            FROM search_engine 
+            WHERE word = %s AND doc_id = %s ORDER BY tf_idf DESC LIMIT 50"""
+        cursor.execute(sql, (val, doc_id))
+
+        results = cursor.fetchall()
+        for row in results:
+            if row[1] >= 1:
+                total += (row[0] * (row[1] * .1))
+            else:
+                total += row[0] * row[1]
 
     return total
 
-def cosineSimilarity(queries, doc_id): 
-    score = dotProduct(data, doc_id) / ( rootSumSquare(queries, idf, doc_id) + rootSumSquare(queries, tf, doc_id))
-    return score
-'''
+
+def cosineSimilarity(queries, docList):
+    cosineDict = {}
+    for key,val in enumerate(docList):
+        score = dotProduct(queries, val) / (rootSumSquare(queries, 'idf', val) + rootSumSquare(queries, 'tf', val))
+        cosineDict[val] = score
+    return cosineDict
+
 
 def UserInput():
+    directory = "/Users/daniel/Downloads/WEBPAGES_RAW"
+    with open(directory + '/bookkeeping.json') as f:
+        docId_url_dict = json.load(f)
+
     try:
         connection = psycopg2.connect(user="postgres",
                                       password="mysecretpassword",
@@ -245,11 +222,11 @@ def UserInput():
                                       database="postgres")
 
         cursor = connection.cursor()
-        print("successfully connected")
     except (Exception, psycopg2.Error) as error:
         print("Error while connecting to PostgreSQL", error)
 
     while(1):
+
         query = input("What do you want to search\n> ")
         queryList = query.split()
 
@@ -262,21 +239,44 @@ def UserInput():
             sql = """SELECT url FROM search_engine WHERE word=%s ORDER BY tf_idf DESC LIMIT 20"""
             cursor.execute(sql, [queryList[0]])
             results = cursor.fetchall()
+            counter = 1
+            for row in results:
+                print("{}: {}".format(counter, row[0]))
+                counter += 1
+                if counter == 21:
+                    break
+
         else:
-            # get a list of docs to look through 
-            # sql statement could be something like 
-            # join all the docIDs that have the words in query 
-            # limit by tfid score and limit search to like 50-100
-            # put all the results in a docList
-            '''
-            for i in docList:
-               dict{docList[1]} =  cosineSimilarity(query, docList[i])
-            '''
-            # print top 20 results from dict
-        for key,val in enumerate(results):
-            print(val)
+            # Initialize the overall set
+            sql = "SELECT doc_id FROM search_engine WHERE word = %s ORDER BY tf_idf DESC LIMIT 500"
+            cursor.execute(sql, [queryList[0]])
+            results = cursor.fetchall()
+            docid_list = []
+            for row in results:
+                docid_list.append(row[0])
+            overall_ID_set = set(docid_list)
+
+            for key, value in enumerate(queryList):
+                sql = "SELECT doc_id FROM search_engine WHERE word = %s ORDER BY tf_idf DESC LIMIT 500"
+                cursor.execute(sql, [value])
+                results = cursor.fetchall()
+                temp_list = []
+                for row in results:
+                    temp_list.append(row[0])
+
+                temp_ID_set = set(temp_list)
+                overall_ID_set = set(list(overall_ID_set & temp_ID_set))
+
+            resultDict = cosineSimilarity(queryList,list(overall_ID_set))
+            result_sorted_keys = sorted(resultDict.items(), key=operator.itemgetter(1), reverse=True)
+            #print(result_sorted_keys)
+            counter = 1
+            for r in result_sorted_keys:
+                print("{}: {}".format(counter, docId_url_dict[r[0]]))
+                counter += 1
+                if counter == 21:
+                    break
 
 
 if __name__ == "__main__":
     UserInput()
-    print('Finished!!!!')
