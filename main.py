@@ -72,6 +72,7 @@ def insert_row(doc_id, word, url, frequency, tf):  # , idf, tf_idf):
 def compute_tf(tf_dict, freq_dict, total_term):
     for word in tf_dict:
         tf_dict[word] = freq_dict[word] / total_term
+        
 
 
 def search_engine():
