@@ -32,6 +32,10 @@ stopWord = ["a", "about", "above", "after", "again", "against", "all", "am", "an
             "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you",
             "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
 
+stopWord = set(stopWord)
+
+
+
 
 def computeWordFrequencies(aList, frequencyDict):
     for word in aList:
@@ -44,9 +48,8 @@ def computeWordFrequencies(aList, frequencyDict):
 
 
 def insert_row(doc_id, word, url, frequency, tf):  # , idf, tf_idf):
-    sql = """INSERT INTO search_engine_tfidf(doc_id, word, url, frequency, tf)
-              VALUES(%s, %s, %s, %s, %s)
-              ON CONFLICT DO NOTHING;"""
+    sql = """INSERT INTO search_engine(doc_id, word, url, frequency, tf)
+              VALUES(%s, %s, %s, %s, %s);"""
     try:
         connection = psycopg2.connect(user="postgres",
                                       password="mysecretpassword",
@@ -78,6 +81,8 @@ def search_engine():
     docId_url_dict = {}
     count = 0
     overallWords = 0
+    freqDictPerDocument = {}
+    tfDictPerDocument = {}
 
     # Iterates through the directory first to fill up the dictionary to avoid data error
     # for folder in os.listdir(directory):
@@ -118,7 +123,7 @@ def search_engine():
             indexI = 0;
             for word, tag in pos_tag(tokens):
                 wntag = tag[0].lower()
-                wntag = wntag if wntag in ['a', 'r', 'n', 'v'] else None
+                wntag = wntag if wntag in set(['a', 'r', 'n', 'v']) else None
                 if wntag:
                     tokens[indexI] = lemmatizer.lemmatize(word, wntag)
 
@@ -142,8 +147,8 @@ def search_engine():
             # insert the docID | word | word freq | URL
             # not sure if code below will work
 
-            for word in freqDictPerDocument.keys():
-                insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
+        for word in freqDictPerDocument.keys():
+            insert_row(docID, word, docId_url_dict[docID], freqDictPerDocument[word], tfDictPerDocument[word])
 
             # Replace 9999999999 with # of documents with term t in it which is retrieved using SQL (10 argument is log base)
             # idfDictPerDocument[word] = math.log(37497 / 999999999, 10)
